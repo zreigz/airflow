@@ -5,12 +5,12 @@ output "namespace" {
 
 output "airflow_secret_name" {
   description = "Name of the Kubernetes secret containing Airflow credentials"
-  value       = kubernetes_secret.airflow.metadata[0].name
+  value       = kubernetes_manifest.airflow.manifest.metadata.name
 }
 
 output "postgresql_secret_name" {
   description = "Name of the Kubernetes secret containing PostgreSQL credentials"
-  value       = kubernetes_secret.postgresql.metadata[0].name
+  value       = kubernetes_manifest.postgresql.manifest.metadata.name
 }
 
 output "postgres_password" {
@@ -24,4 +24,3 @@ output "fernet_key" {
   value       = base64encode(random_password.fernet_key.result)
   sensitive   = true
 }
-

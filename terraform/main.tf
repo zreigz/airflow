@@ -53,45 +53,61 @@ data "kubernetes_namespace" "airflow" {
 # These are mounted into the Airflow pods via extraEnvFrom / extraEnv in the
 # Helm values file (helm/airflow.yaml).
 
-resource "kubernetes_secret" "airflow" {
-  metadata {
-    name      = "airflow-secrets"
-    namespace = data.kubernetes_namespace.airflow.metadata[0].name
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
-      "app.kubernetes.io/name"       = "airflow"
+# ── Airflow secrets ───────────────────────────────────────────────────────────
+# kubernetes_manifest uses server-side apply (upsert) so re-runs never fail
+# with "already exists", even when Terraform state is reset.
+
+resource "kubernetes_manifest" "airflow" {
+  manifest = {
+    apiVersion = "v1"
+    kind       = "Secret"
+    metadata = {
+      name      = "airflow-secrets"
+      namespace = var.namespace
+      labels = {
+        "app.kubernetes.io/managed-by" = "terraform"
+        "app.kubernetes.io/name"       = "airflow"
+      }
+    }
+    stringData = {
+      fernet-key        = base64encode(random_password.fernet_key.result)
+      webserver-secret  = random_password.webserver_secret_key.result
+      postgres-password = random_password.postgres_password.result
+      connection-string = "postgresql+psycopg2://airflow:${random_password.postgres_password.result}@airflow-postgresql:5432/airflow"
     }
   }
 
-  data = {
-    # Fernet key: 32 bytes → base64 → URL-safe base64 (Fernet expects this)
-    fernet-key        = base64encode(random_password.fernet_key.result)
-    webserver-secret  = random_password.webserver_secret_key.result
-    postgres-password = random_password.postgres_password.result
-    # Full connection string consumed by Airflow via AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-    connection-string = "postgresql+psycopg2://airflow:${random_password.postgres_password.result}@airflow-postgresql:5432/airflow"
+  field_manager {
+    force_conflicts = true
   }
 }
 
-# ── PostgreSQL admin secret (used by the embedded PostgreSQL sub-chart) ───────
-# The postgresql sub-chart reads 'postgres-password' key from this secret.
+# ── PostgreSQL secret (used by the embedded Bitnami PostgreSQL sub-chart) ─────
 
-resource "kubernetes_secret" "postgresql" {
-  metadata {
-    name      = "airflow-postgresql"
-    namespace = data.kubernetes_namespace.airflow.metadata[0].name
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
-      "app.kubernetes.io/name"       = "airflow-postgresql"
+resource "kubernetes_manifest" "postgresql" {
+  manifest = {
+    apiVersion = "v1"
+    kind       = "Secret"
+    metadata = {
+      name      = "airflow-postgresql"
+      namespace = var.namespace
+      labels = {
+        "app.kubernetes.io/managed-by" = "terraform"
+        "app.kubernetes.io/name"       = "airflow-postgresql"
+      }
+    }
+    stringData = {
+      postgres-password   = random_password.postgres_password.result
+      password            = random_password.postgres_password.result
+      # Key used by the Bitnami sub-chart in airflow-helm 8.9.0 to initialise
+      # the postgres superuser AND the custom airflow user at first boot.
+      postgresql-password = random_password.postgres_password.result
     }
   }
 
-  data = {
-    postgres-password    = random_password.postgres_password.result
-    password             = random_password.postgres_password.result
-    # Key used by the Bitnami PostgreSQL sub-chart embedded in airflow-helm 8.9.0
-    # to initialise the postgres superuser AND the custom (airflow) user at first boot.
-    postgresql-password  = random_password.postgres_password.result
+  field_manager {
+    force_conflicts = true
   }
 }
+
 
