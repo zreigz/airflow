@@ -13,8 +13,8 @@ airflow:
     tag: "2.8.1"
     pullPolicy: IfNotPresent
 
-  # LocalExecutor: no Celery / Redis needed; tasks run in the scheduler process
-  executor: LocalExecutor
+  # KubernetesExecutor: each task runs as a short-lived pod; no Redis/Celery needed
+  executor: KubernetesExecutor
 
   # Fernet key is injected from the Terraform-managed secret
   fernetKey: ""
@@ -85,9 +85,6 @@ web:
   livenessProbe:
     initialDelaySeconds: 60
 
-# ── Workers (not used with LocalExecutor, kept minimal) ───────────────────────
-workers:
-  enabled: false
 
 # ── Embedded PostgreSQL ───────────────────────────────────────────────────────
 postgresql:
@@ -112,7 +109,7 @@ postgresql:
         cpu: 500m
         memory: 512Mi
 
-# ── Redis (not needed for LocalExecutor) ─────────────────────────────────────
+# ── Redis (not needed for KubernetesExecutor) ─────────────────────────────────
 redis:
   enabled: false
 
