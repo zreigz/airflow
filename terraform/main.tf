@@ -12,8 +12,11 @@ terraform {
 }
 
 provider "kubernetes" {
-  config_path    = "~/.kube/config"
-  config_context = var.kube_context
+  # Explicit in-cluster configuration: reads the service-account token and CA
+  # cert that Kubernetes mounts into every pod automatically.
+  host                   = "https://kubernetes.default.svc"
+  cluster_ca_certificate = file("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+  token                  = file("/var/run/secrets/kubernetes.io/serviceaccount/token")
 }
 
 # ── Random secrets ────────────────────────────────────────────────────────────
@@ -52,7 +55,7 @@ resource "kubernetes_namespace" "airflow" {
     # Plural also manages this namespace; prevent Terraform from destroying it
     # when the stack is torn down (Plural will handle deletion).
     prevent_destroy = false
-    ignore_changes  = [metadata[0].labels, metadata[0].annotations]
+    ignore_changes  = [metadata]
   }
 }
 
