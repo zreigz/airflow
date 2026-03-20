@@ -61,6 +61,7 @@ resource "kubernetes_manifest" "airflow" {
   manifest = {
     apiVersion = "v1"
     kind       = "Secret"
+    type       = "Opaque"
     metadata = {
       name      = "airflow-secrets"
       namespace = var.namespace
@@ -69,11 +70,12 @@ resource "kubernetes_manifest" "airflow" {
         "app.kubernetes.io/name"       = "airflow"
       }
     }
-    stringData = {
-      fernet-key        = base64encode(random_password.fernet_key.result)
-      webserver-secret  = random_password.webserver_secret_key.result
-      postgres-password = random_password.postgres_password.result
-      connection-string = "postgresql+psycopg2://airflow:${random_password.postgres_password.result}@airflow-postgresql:5432/airflow"
+    # data values must be base64-encoded (kubernetes_manifest sends the manifest verbatim)
+    data = {
+      fernet-key        = base64encode(base64encode(random_password.fernet_key.result))
+      webserver-secret  = base64encode(random_password.webserver_secret_key.result)
+      postgres-password = base64encode(random_password.postgres_password.result)
+      connection-string = base64encode("postgresql+psycopg2://airflow:${random_password.postgres_password.result}@airflow-postgresql:5432/airflow")
     }
   }
 
@@ -88,6 +90,7 @@ resource "kubernetes_manifest" "postgresql" {
   manifest = {
     apiVersion = "v1"
     kind       = "Secret"
+    type       = "Opaque"
     metadata = {
       name      = "airflow-postgresql"
       namespace = var.namespace
@@ -96,12 +99,10 @@ resource "kubernetes_manifest" "postgresql" {
         "app.kubernetes.io/name"       = "airflow-postgresql"
       }
     }
-    stringData = {
-      postgres-password   = random_password.postgres_password.result
-      password            = random_password.postgres_password.result
-      # Key used by the Bitnami sub-chart in airflow-helm 8.9.0 to initialise
-      # the postgres superuser AND the custom airflow user at first boot.
-      postgresql-password = random_password.postgres_password.result
+    data = {
+      postgres-password   = base64encode(random_password.postgres_password.result)
+      password            = base64encode(random_password.postgres_password.result)
+      postgresql-password = base64encode(random_password.postgres_password.result)
     }
   }
 
