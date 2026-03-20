@@ -89,13 +89,9 @@ web:
 # ── Embedded PostgreSQL ───────────────────────────────────────────────────────
 postgresql:
   enabled: true
-  auth:
-    username: airflow
-    database: airflow
-    # Fixed password – avoids race condition between Terraform secret creation
-    # and Bitnami PostgreSQL initialisation on first boot.
-    password: "airflow"
-    postgresPassword: "airflow"
+  postgresqlDatabase: airflow
+  postgresqlUsername: airflow
+  postgresqlPassword: "airflow"
   primary:
     persistence:
       enabled: true
