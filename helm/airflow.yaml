@@ -92,11 +92,10 @@ postgresql:
   auth:
     username: airflow
     database: airflow
-    # Password is read from the secret created by Terraform
-    existingSecret: airflow-postgresql
-    secretKeys:
-      adminPasswordKey: postgres-password
-      userPasswordKey: password
+    # Fixed password – avoids race condition between Terraform secret creation
+    # and Bitnami PostgreSQL initialisation on first boot.
+    password: "airflow"
+    postgresPassword: "airflow"
   primary:
     persistence:
       enabled: true

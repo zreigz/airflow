@@ -33,11 +33,6 @@ resource "random_password" "webserver_secret_key" {
   special = false
 }
 
-resource "random_password" "postgres_password" {
-  length  = 16
-  special = false
-}
-
 # ── Namespace ─────────────────────────────────────────────────────────────────
 # The namespace is created by Plural's ServiceDeployment (createNamespace: true).
 # Terraform only reads it to ensure secrets are placed in the correct namespace.
@@ -48,14 +43,12 @@ data "kubernetes_namespace" "airflow" {
   }
 }
 
-
-# ── Airflow secrets ───────────────────────────────────────────────────────────
-# These are mounted into the Airflow pods via extraEnvFrom / extraEnv in the
-# Helm values file (helm/airflow.yaml).
-
 # ── Airflow secrets ───────────────────────────────────────────────────────────
 # kubernetes_manifest uses server-side apply (upsert) so re-runs never fail
 # with "already exists", even when Terraform state is reset.
+# PostgreSQL password is fixed ("airflow") and matches postgresql.auth.password
+# in helm/airflow.yaml so there is no race condition between Terraform and
+# Bitnami's first-boot initialisation.
 
 resource "kubernetes_manifest" "airflow" {
   manifest = {
@@ -74,8 +67,7 @@ resource "kubernetes_manifest" "airflow" {
     data = {
       fernet-key        = base64encode(base64encode(random_password.fernet_key.result))
       webserver-secret  = base64encode(random_password.webserver_secret_key.result)
-      postgres-password = base64encode(random_password.postgres_password.result)
-      connection-string = base64encode("postgresql+psycopg2://airflow:${random_password.postgres_password.result}@airflow-postgresql:5432/airflow")
+      connection-string = base64encode("postgresql+psycopg2://airflow:airflow@airflow-postgresql:5432/airflow")
     }
   }
 
@@ -83,32 +75,3 @@ resource "kubernetes_manifest" "airflow" {
     force_conflicts = true
   }
 }
-
-# ── PostgreSQL secret (used by the embedded Bitnami PostgreSQL sub-chart) ─────
-
-resource "kubernetes_manifest" "postgresql" {
-  manifest = {
-    apiVersion = "v1"
-    kind       = "Secret"
-    type       = "Opaque"
-    metadata = {
-      name      = "airflow-postgresql"
-      namespace = var.namespace
-      labels = {
-        "app.kubernetes.io/managed-by" = "terraform"
-        "app.kubernetes.io/name"       = "airflow-postgresql"
-      }
-    }
-    data = {
-      postgres-password   = base64encode(random_password.postgres_password.result)
-      password            = base64encode(random_password.postgres_password.result)
-      postgresql-password = base64encode(random_password.postgres_password.result)
-    }
-  }
-
-  field_manager {
-    force_conflicts = true
-  }
-}
-
-
