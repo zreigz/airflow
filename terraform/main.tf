@@ -97,8 +97,11 @@ resource "kubernetes_secret" "postgresql" {
   }
 
   data = {
-    postgres-password = random_password.postgres_password.result
-    password          = random_password.postgres_password.result
+    postgres-password    = random_password.postgres_password.result
+    password             = random_password.postgres_password.result
+    # Key used by the Bitnami PostgreSQL sub-chart embedded in airflow-helm 8.9.0
+    # to initialise the postgres superuser AND the custom (airflow) user at first boot.
+    postgresql-password  = random_password.postgres_password.result
   }
 }
 
