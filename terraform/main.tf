@@ -40,22 +40,11 @@ resource "random_password" "postgres_password" {
 
 # ── Namespace ─────────────────────────────────────────────────────────────────
 # The namespace is created by Plural's ServiceDeployment (createNamespace: true).
-# Terraform only needs to ensure it exists before writing secrets into it.
+# Terraform only reads it to ensure secrets are placed in the correct namespace.
 
-resource "kubernetes_namespace" "airflow" {
+data "kubernetes_namespace" "airflow" {
   metadata {
     name = var.namespace
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
-      "app.kubernetes.io/name"       = "airflow"
-    }
-  }
-
-  lifecycle {
-    # Plural also manages this namespace; prevent Terraform from destroying it
-    # when the stack is torn down (Plural will handle deletion).
-    prevent_destroy = false
-    ignore_changes  = [metadata]
   }
 }
 
@@ -66,7 +55,7 @@ resource "kubernetes_namespace" "airflow" {
 resource "kubernetes_secret" "airflow" {
   metadata {
     name      = "airflow-secrets"
-    namespace = kubernetes_namespace.airflow.metadata[0].name
+    namespace = data.kubernetes_namespace.airflow.metadata[0].name
     labels = {
       "app.kubernetes.io/managed-by" = "terraform"
       "app.kubernetes.io/name"       = "airflow"
@@ -89,7 +78,7 @@ resource "kubernetes_secret" "airflow" {
 resource "kubernetes_secret" "postgresql" {
   metadata {
     name      = "airflow-postgresql"
-    namespace = kubernetes_namespace.airflow.metadata[0].name
+    namespace = data.kubernetes_namespace.airflow.metadata[0].name
     labels = {
       "app.kubernetes.io/managed-by" = "terraform"
       "app.kubernetes.io/name"       = "airflow-postgresql"
