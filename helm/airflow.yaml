@@ -109,7 +109,10 @@ postgresql:
         cpu: 500m
         memory: 512Mi
 
-# ── Redis (not needed for KubernetesExecutor) ─────────────────────────────────
+# ── Workers / Redis / Flower (not needed for KubernetesExecutor) ──────────────
+workers:
+  enabled: false
+
 redis:
   enabled: false
 
