@@ -95,6 +95,8 @@ spec:
     - stackRef:
         name: airflow
         namespace: default
+  configuration:
+    stackName: airflow
   git:
     ref: main
     folder: helm
