@@ -1,0 +1,104 @@
+apiVersion: deployments.plural.sh/v1alpha1
+kind: Cluster
+metadata:
+  name: existing
+  namespace: default
+spec:
+  handle: lukasz
+---
+apiVersion: deployments.plural.sh/v1alpha1
+kind: GitRepository
+metadata:
+  name: airflow
+  namespace: default
+spec:
+  url: https://github.com/zreigz/airflow.git
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: full-access
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: full-access-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: full-access
+    namespace: default
+---
+apiVersion: deployments.plural.sh/v1alpha1
+kind: InfrastructureStack
+metadata:
+  labels:
+    app.kubernetes.io/name: infrastructurestack
+    app.kubernetes.io/instance: infrastructurestack-sample
+    app.kubernetes.io/part-of: controller
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: controller
+  name: airflow
+  namespace: default
+spec:
+  name: airflow
+  detach: true
+  type: TERRAFORM
+  approval: true
+  manageState: true
+  actor: lukasz@plural.sh
+  configuration:
+    version: "1.8"
+  repositoryRef:
+    name: airflow
+    namespace: default
+  clusterRef:
+    name: existing
+    namespace: default
+  git:
+    ref: main
+    folder: terraform
+  jobSpec:
+    namespace: default
+    serviceAccount: full-access
+
+---
+apiVersion: deployments.plural.sh/v1alpha1
+kind: ServiceDeployment
+metadata:
+  name: airflow
+  namespace: default
+spec:
+  syncConfig:
+    createNamespace: true
+    deleteNamespace: true
+    enforceNamespace: true
+  namespace: airflow
+  name: airflow
+  repositoryRef:
+    kind: GitRepository
+    name: airflow
+    namespace: default
+  helm:
+    version: "8.9.0"
+    chart: airflow
+    release: airflow
+    ignoreHooks: false
+    url: https://airflow-helm.github.io/charts
+    valuesFiles:
+      - airflow.yaml
+  imports:
+    - stackRef:
+        name: airflow
+        namespace: default
+  git:
+    ref: main
+    folder: helm
+  clusterRef:
+    name: existing
+    namespace: default
+

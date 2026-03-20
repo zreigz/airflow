@@ -1,0 +1,138 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Airflow Helm values – airflow-helm/airflow chart 8.9.0
+# Target: local kind cluster
+# Prerequisites (created by Terraform before this Helm install):
+#   - namespace "airflow"
+#   - secret "airflow-secrets"    (fernet-key, webserver-secret, connection-string)
+#   - secret "airflow-postgresql" (password)
+# ─────────────────────────────────────────────────────────────────────────────
+
+airflow:
+  image:
+    repository: apache/airflow
+    tag: "2.8.1"
+    pullPolicy: IfNotPresent
+
+  # LocalExecutor: no Celery / Redis needed; tasks run in the scheduler process
+  executor: LocalExecutor
+
+  # Fernet key is injected from the Terraform-managed secret
+  fernetKey: ""
+
+  config:
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: "UTC"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "30"
+    AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
+
+  # Extra env-vars sourced from the secret created by Terraform
+  extraEnv:
+    - name: AIRFLOW__CORE__FERNET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: airflow-secrets
+          key: fernet-key
+    - name: AIRFLOW__WEBSERVER__SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: airflow-secrets
+          key: webserver-secret
+    - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+      valueFrom:
+        secretKeyRef:
+          name: airflow-secrets
+          key: connection-string
+
+  # Default admin user created on first startup
+  users:
+    - username: admin
+      password: admin
+      role: Admin
+      email: admin@example.com
+      firstName: Admin
+      lastName: User
+
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+scheduler:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  livenessProbe:
+    initialDelaySeconds: 60
+
+# ── Web server ────────────────────────────────────────────────────────────────
+web:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: NodePort
+    nodePort:
+      http: 30080
+  readinessProbe:
+    initialDelaySeconds: 60
+  livenessProbe:
+    initialDelaySeconds: 60
+
+# ── Workers (not used with LocalExecutor, kept minimal) ───────────────────────
+workers:
+  enabled: false
+
+# ── Embedded PostgreSQL ───────────────────────────────────────────────────────
+postgresql:
+  enabled: true
+  auth:
+    username: airflow
+    database: airflow
+    # Password is read from the secret created by Terraform
+    existingSecret: airflow-postgresql
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
+  primary:
+    persistence:
+      enabled: true
+      size: 2Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# ── Redis (not needed for LocalExecutor) ─────────────────────────────────────
+redis:
+  enabled: false
+
+# ── DAGs – mount from git or a PVC; disabled for a quick local start ──────────
+dags:
+  persistence:
+    enabled: false
+  gitSync:
+    enabled: false
+
+# ── Logs – use emptyDir for local development ─────────────────────────────────
+logs:
+  persistence:
+    enabled: false
+
+# ── Flower (Celery UI) – not needed with LocalExecutor ───────────────────────
+flower:
+  enabled: false
+
+# ── Ingress (optional – use NodePort above or port-forward instead) ───────────
+ingress:
+  enabled: false
+
