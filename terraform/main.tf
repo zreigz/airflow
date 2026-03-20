@@ -48,6 +48,7 @@ data "kubernetes_namespace" "airflow" {
   }
 }
 
+
 # ── Airflow secrets ───────────────────────────────────────────────────────────
 # These are mounted into the Airflow pods via extraEnvFrom / extraEnv in the
 # Helm values file (helm/airflow.yaml).
